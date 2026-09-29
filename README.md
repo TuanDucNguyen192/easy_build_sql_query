@@ -36,6 +36,7 @@ SUPABASE_KEY = "<anon-key>"
 ## Sử dụng
 
 - Admin vào **Bảng & Cột** để thêm metadata hoặc import CSV cột có header `column_name,data_type`.
+- Để import hàng loạt schema thực tế, dùng khối **Import toàn bộ schema**. File CSV cần `table_name,column_name,data_type`; có thể lấy [mẫu](samples/schema_import_example.csv). Các cột tùy chọn: `is_primary_key`, `is_lookup_column`, `description`. Chạy lại cùng file sẽ cập nhật cột thay vì tạo trùng.
 - Admin vào **Lookup** để khai báo cột `USER_ID` / `STATUS_ID` và import CSV `id,display_value`.
 - Mọi người vào **Query**, chọn bảng, cột, JOIN, điều kiện, sắp xếp. SQL cập nhật tức thời và luôn dùng `FETCH FIRST n ROWS ONLY` đúng Oracle.
 - Lịch sử query dùng chung; người tạo chỉ xóa được query của mình, admin xóa được toàn bộ.
@@ -47,3 +48,13 @@ Trong tab **Bảng & Cột**, dùng nút **Tải backup bảng CSV**. Để back
 ## Lưu ý bảo mật
 
 Chỉ dùng **anon key** trên Streamlit. Không bao giờ đưa `service_role` key vào secrets của ứng dụng. RLS trong schema giới hạn sửa metadata/lookup cho ADMIN.
+
+## Cấp quyền Admin
+
+Sau khi tạo tài khoản trong Supabase Auth, chạy trong SQL Editor (thay email đúng của bạn):
+
+```sql
+update public.profiles set role = 'ADMIN' where email = 'admin@shaoyin.com';
+```
+
+Đăng xuất rồi đăng nhập lại để app nhận role mới và hiện tab **Bảng & Cột** cùng **Lookup**.

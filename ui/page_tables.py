@@ -4,6 +4,16 @@ from db import tables_repo
 
 def render(client):
     st.subheader("Quản lý Bảng & Cột")
+    with st.expander("Import toàn bộ schema từ một CSV", expanded=False):
+        st.caption("Header bắt buộc: table_name,column_name,data_type. Tuỳ chọn: is_primary_key,is_lookup_column,description")
+        schema_file = st.file_uploader("CSV toàn bộ bảng/cột", type="csv", key="schema_csv")
+        if schema_file and st.button("Import schema", type="primary"):
+            try:
+                table_count, column_count = tables_repo.import_schema_csv(client, schema_file, st.session_state.user.id)
+                st.success(f"Đã import {column_count} cột thuộc {table_count} bảng.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Import thất bại: {exc}")
     with st.expander("+ Thêm bảng", expanded=False):
         with st.form("new_table"):
             name = st.text_input("Tên bảng Oracle").upper()

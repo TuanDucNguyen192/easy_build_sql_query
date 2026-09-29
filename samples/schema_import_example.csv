@@ -1,0 +1,7 @@
+table_name,column_name,data_type,is_primary_key,is_lookup_column,description
+DONHANG,ID,NUMBER,true,false,Khóa chính
+DONHANG,MA_DON,VARCHAR2,false,false,Mã đơn hàng
+DONHANG,USER_ID,NUMBER,false,true,Người tạo đơn
+DONHANG,NGAY_TAO,DATE,false,false,Ngày tạo
+USERS,ID,NUMBER,true,false,Khóa chính
+USERS,NAME,VARCHAR2,false,false,Tên người dùng

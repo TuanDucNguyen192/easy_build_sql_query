@@ -23,7 +23,8 @@ create table if not exists public.lookup_values (
 );
 create table if not exists public.query_history (
   id bigserial primary key, name text not null, state_json jsonb, sql_text text not null,
-  created_by uuid references auth.users, created_at timestamptz default now()
+  -- FK đến public.profiles giúp PostgREST có thể truy vấn quan hệ lịch sử/user.
+  created_by uuid references public.profiles(id), created_at timestamptz default now()
 );
 
 -- Tự tạo profile khi một người dùng được tạo trong Supabase Auth.
