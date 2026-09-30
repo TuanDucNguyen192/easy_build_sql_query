@@ -12,8 +12,8 @@ def list_history(client):
     return rows
 
 
-def save_history(client, name, state, sql, user_id):
-    return client.table("query_history").insert({"name": name, "state_json": state, "sql_text": sql, "created_by": user_id}).execute()
+def save_history(client, name, state, sql, user_id, query_type="SELECT"):
+    return client.table("query_history").insert({"name": name, "state_json": state, "sql_text": sql, "created_by": user_id, "query_type": query_type}).execute()
 
 
 def delete_history(client, history_id):

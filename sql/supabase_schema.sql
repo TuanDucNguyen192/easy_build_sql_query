@@ -11,7 +11,8 @@ create table if not exists public.tables_meta (
 create table if not exists public.columns_meta (
   id bigserial primary key, table_id bigint references public.tables_meta on delete cascade,
   column_name text not null, data_type text, is_primary_key boolean default false,
-  is_lookup_column boolean default false, description text, unique(table_id, column_name)
+  is_lookup_column boolean default false, is_nullable boolean default true,
+  has_default boolean default false, description text, unique(table_id, column_name)
 );
 create table if not exists public.lookups (
   id bigserial primary key, name text not null unique, source_table text, id_column text,
@@ -23,9 +24,18 @@ create table if not exists public.lookup_values (
 );
 create table if not exists public.query_history (
   id bigserial primary key, name text not null, state_json jsonb, sql_text text not null,
+  query_type text not null default 'SELECT' check (query_type in ('SELECT','INSERT','UPDATE')),
   -- FK đến public.profiles giúp PostgREST có thể truy vấn quan hệ lịch sử/user.
   created_by uuid references public.profiles(id), created_at timestamptz default now()
 );
+-- Nâng cấp an toàn cho database đã tạo bằng bản schema trước.
+alter table public.columns_meta add column if not exists is_nullable boolean default true;
+alter table public.columns_meta add column if not exists has_default boolean default false;
+alter table public.query_history add column if not exists query_type text default 'SELECT';
+create table if not exists public.app_settings (
+  id bigserial primary key, key text unique, value text, updated_at timestamptz default now()
+);
+insert into public.app_settings(key, value) values ('oracle_version', '19c') on conflict(key) do nothing;
 
 -- Tự tạo profile khi một người dùng được tạo trong Supabase Auth.
 create or replace function public.handle_new_user() returns trigger language plpgsql security definer set search_path = public as $$
@@ -44,6 +54,7 @@ alter table public.columns_meta enable row level security;
 alter table public.lookups enable row level security;
 alter table public.lookup_values enable row level security;
 alter table public.query_history enable row level security;
+alter table public.app_settings enable row level security;
 
 -- Xóa policy cũ nếu chạy lại script.
 drop policy if exists profiles_read on public.profiles; drop policy if exists profiles_admin on public.profiles;
@@ -66,6 +77,9 @@ create policy values_admin on public.lookup_values for all to authenticated usin
 create policy history_read on public.query_history for select to authenticated using (true);
 create policy history_insert on public.query_history for insert to authenticated with check (created_by=auth.uid());
 create policy history_delete on public.query_history for delete to authenticated using (created_by=auth.uid() or public.is_admin());
+drop policy if exists settings_read on public.app_settings; drop policy if exists settings_admin on public.app_settings;
+create policy settings_read on public.app_settings for select to authenticated using (true);
+create policy settings_admin on public.app_settings for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
 -- Dữ liệu mẫu. Có thể xóa sau khi kiểm thử.
 insert into public.tables_meta(table_name,alias,description) values

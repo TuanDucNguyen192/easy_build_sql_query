@@ -113,10 +113,21 @@ def render(client):
         time_condition = _time_condition(all_columns)
         if time_condition:
             conditions.append(time_condition)
-        limit = st.selectbox("Số lượng", [10, 50, 100, 500, 1000, "Tất cả"])
+        group_choices = st.multiselect("GROUP BY", all_columns, format_func=lambda x: x[0], key="group_by_columns")
+        having_count = st.number_input("Số điều kiện HAVING", 0, 10, 0, step=1)
+        having_conditions = []
+        having_columns = all_columns + [("COUNT(*)", {"column_name": "COUNT(*)", "data_type": "NUMBER"})]
+        for i in range(int(having_count)):
+            with st.expander(f"Điều kiện HAVING {i+1}", expanded=True):
+                choice = st.selectbox("Cột / COUNT(*)", having_columns, format_func=lambda x: x[0], key=f"havingcol{i}")
+                op = st.selectbox("Toán tử", ops, key=f"havingop{i}")
+                value, value2 = _value_input(f"having_{i}", choice[1], op, lookups, client)
+                having_conditions.append({"ref": choice[0], "op": op, "value": value, "value2": value2, "data_type": choice[1].get("data_type")})
+        limit = st.selectbox("Số lượng", [10, 50, 100, 500, 1000, "Tất cả"], index=5)
         order_choice = st.selectbox("Sắp xếp", ["Không sắp xếp"] + [x[0] for x in all_columns])
         direction = st.selectbox("Chiều sắp xếp", ["ASC", "DESC"])
-    state = {"main": main, "selected": selected, "select_all_main": select_all_main, "links": links, "conditions": conditions, "limit": limit,
+    state = {"main": main, "selected": selected, "select_all_main": select_all_main, "links": links, "conditions": conditions,
+             "group_by": [item[0] for item in group_choices], "having": having_conditions, "limit": limit,
              "order": None if order_choice == "Không sắp xếp" else {"ref": order_choice, "direction": direction}}
     try: sql = build_sql(state)
     except Exception as exc: sql = f"-- Lỗi sinh SQL: {exc}"

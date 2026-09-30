@@ -65,6 +65,12 @@ def build_sql(state):
     conditions = [condition_sql(c) for c in state.get("conditions", [])]
     if conditions:
         lines.append("WHERE " + "\n  AND ".join(conditions))
+    group_by = state.get("group_by", [])
+    if group_by:
+        lines.append("GROUP BY " + ", ".join(group_by))
+    having = [condition_sql(c) for c in state.get("having", [])]
+    if having:
+        lines.append("HAVING " + "\n   AND ".join(having))
     if state.get("order"):
         lines.append(f"ORDER BY {state['order']['ref']} {state['order']['direction']}")
     if state.get("limit") not in (None, "Tất cả"):

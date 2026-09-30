@@ -64,7 +64,8 @@ def import_schema_csv(client, file, user_id):
         def as_bool(value): return str(value).strip().lower() in ("1", "true", "yes", "y", "x")
         rows.append({"table_id": table_map[record["table_name"]], "column_name": record["column_name"],
                      "data_type": record["data_type"], "is_primary_key": as_bool(record.get("is_primary_key", "")),
-                     "is_lookup_column": as_bool(record.get("is_lookup_column", "")),
+        "is_lookup_column": as_bool(record.get("is_lookup_column", "")), "is_nullable": as_bool(record.get("is_nullable", "true")),
+        "has_default": as_bool(record.get("has_default", "")),
                      "description": str(record.get("description", ""))})
     if rows:
         client.table("columns_meta").upsert(rows, on_conflict="table_id,column_name").execute()

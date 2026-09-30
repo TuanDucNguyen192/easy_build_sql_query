@@ -6,6 +6,7 @@ Web app Streamlit tạo SQL Oracle bằng thao tác chuột. Ứng dụng không
 
 1. Tạo project miễn phí tại [Supabase](https://supabase.com/dashboard), vào **Project Settings → API** và copy Project URL cùng `anon` key.
 2. Mở SQL Editor của project, dán và chạy toàn bộ [sql/supabase_schema.sql](sql/supabase_schema.sql). Schema tạo bảng, RLS policy và dữ liệu mẫu.
+   Nếu đã có database từ phiên bản cũ, chỉ cần chạy thêm [sql/supabase_schema_update_insert_update.sql](sql/supabase_schema_update_insert_update.sql) để dùng lịch sử INSERT/UPDATE và metadata NULL/DEFAULT.
 3. Trong **Authentication → Users**, tạo user bằng email/password. Chạy câu này trong SQL Editor (thay email):
 
 ```sql
@@ -38,8 +39,10 @@ SUPABASE_KEY = "<anon-key>"
 - Admin vào **Bảng & Cột** để thêm metadata hoặc import CSV cột có header `column_name,data_type`.
 - Để import hàng loạt schema thực tế, dùng khối **Import toàn bộ schema**. File CSV cần `table_name,column_name,data_type`; có thể lấy [mẫu](samples/schema_import_example.csv). Các cột tùy chọn: `is_primary_key`, `is_lookup_column`, `description`. Chạy lại cùng file sẽ cập nhật cột thay vì tạo trùng.
 - Admin vào **Lookup** để khai báo cột `USER_ID` / `STATUS_ID`, thêm từng giá trị quan trọng hoặc import CSV `id,display_value`. Khi người dùng chọn cột đó trong điều kiện, ô **Giá trị** sẽ gợi ý theo tên hiển thị và sinh đúng ID vào SQL.
-- Mọi người vào **Query** có thể chọn `SELECT *` cho bảng chính, hoặc chọn các cột riêng lẻ và kéo-thả để đổi thứ tự chúng trong `SELECT`. SQL cập nhật tức thời và luôn dùng `FETCH FIRST n ROWS ONLY` đúng Oracle.
+- Mọi người vào **Query** có thể chọn `SELECT *` cho bảng chính, hoặc chọn các cột riêng lẻ và kéo-thả để đổi thứ tự chúng trong `SELECT`. Mặc định không giới hạn số dòng; có thể chọn giới hạn khi cần. Query cũng hỗ trợ `GROUP BY` và `HAVING`.
 - Tích **Thêm điều kiện thời gian** để tự sinh điều kiện cho hôm nay, hôm qua, 7/30 ngày gần nhất, tháng này, tháng trước hoặc khoảng ngày tự chọn. Các khoảng chọn nhanh dùng mốc Oracle `SYSDATE`, nên luôn đúng vào lúc chạy query.
+- Tab **Insert** sinh `INSERT` từ form cho mọi cột, có lookup, NULL, DEFAULT, tự bỏ khóa chính khi dùng sequence/trigger và hỗ trợ nhiều dòng. Chọn Oracle 19c để sinh từng câu INSERT hoặc 23c+ để dùng multi-row `VALUES`.
+- Tab **Update** sinh `UPDATE ... SET ... WHERE ...`; có lookup, NULL, DEFAULT và chặn Copy/Lưu khi `WHERE` trống cho đến khi tích xác nhận rủi ro.
 - Lịch sử query dùng chung; người tạo chỉ xóa được query của mình, admin xóa được toàn bộ.
 
 ## Backup

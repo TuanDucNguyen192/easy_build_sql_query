@@ -37,9 +37,11 @@ def render(client):
         data_type = b.selectbox("Kiểu", ["NUMBER", "VARCHAR2", "DATE", "TIMESTAMP", "CLOB"])
         pk = c.checkbox("Khóa chính")
         is_lookup = c.checkbox("Cột dùng lookup")
+        nullable = c.checkbox("Cho phép NULL", value=True)
+        has_default = c.checkbox("Có DEFAULT")
         description = st.text_input("Mô tả cột")
         if st.form_submit_button("Thêm cột"):
-            tables_repo.create_column(client, {"table_id": selected["id"], "column_name": col_name, "data_type": data_type, "is_primary_key": pk, "is_lookup_column": is_lookup, "description": description})
+            tables_repo.create_column(client, {"table_id": selected["id"], "column_name": col_name, "data_type": data_type, "is_primary_key": pk, "is_lookup_column": is_lookup, "is_nullable": nullable, "has_default": has_default, "description": description})
             st.rerun()
     upload = st.file_uploader("Import cột từ CSV (column_name,data_type)", type="csv")
     if upload and st.button("Import CSV cột"):

@@ -9,7 +9,7 @@ def render(client):
     rows = history_repo.list_history(client)
     rows = [r for r in rows if search.lower() in (r.get("name") or "").lower()]
     for row in rows:
-        with st.expander(f"{row.get('name', 'Không tên')} · {row.get('creator_email', '')} · {str(row.get('created_at', ''))[:16]}"):
+        with st.expander(f"[{row.get('query_type', 'SELECT')}] {row.get('name', 'Không tên')} · {row.get('creator_email', '')} · {str(row.get('created_at', ''))[:16]}"):
             st.code(row["sql_text"], language="sql")
             a, b = st.columns(2)
             if a.button("Nạp query", key=f"load{row['id']}"):
