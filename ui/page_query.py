@@ -19,6 +19,20 @@ def _suggest(left_columns, right_columns):
     return left_columns[0], right_columns[0]
 
 
+def _table_labels(client, tables):
+    """Tạo nhãn dễ hiểu từ lookup TABLE_NAME; fallback về mô tả metadata."""
+    lookups = lookups_repo.get_lookups(client)
+    table_lookup = next((item for item in lookups if item.get("name", "").upper() == "TABLE_NAME"), None)
+    lookup_descriptions = {}
+    if table_lookup:
+        lookup_descriptions = {str(row["id_value"]).upper(): row["display_value"]
+                               for row in lookups_repo.get_values(client, table_lookup["id"])}
+    return {
+        table["id"]: f"{table['table_name']} — {lookup_descriptions.get(table['table_name'].upper()) or table.get('description') or 'Chưa có mô tả'}"
+        for table in tables
+    }, lookups
+
+
 def _value_input(key, col, operator, lookups, client):
     if operator in ("IS NULL", "IS NOT NULL"): return None, None
     lookup = lookup_for_column(col["column_name"], lookups)
@@ -65,12 +79,16 @@ def render(client):
         st.cache_data.clear(); st.rerun()
     tables = tables_repo.get_tables(client)
     if not tables: st.info("Chưa có metadata. Admin hãy thêm bảng và cột."); return
+    table_labels, lookups = _table_labels(client, tables)
     state_saved = st.session_state.get("query_state", {})
     default_name = state_saved.get("main", {}).get("table_name")
     default_idx = next((i for i,t in enumerate(tables) if t["table_name"] == default_name), 0)
     left, right = st.columns(2)
     with left:
-        main = st.selectbox("Bảng chính", tables, index=default_idx, format_func=lambda x: x["table_name"])
+        main = st.selectbox("Bảng chính", tables, index=default_idx, format_func=lambda x: table_labels[x["id"]], help="Hiển thị tên Oracle kèm mô tả từ lookup TABLE_NAME.")
+        description = table_labels[main["id"]].partition(" — ")[2]
+        if description and description != "Chưa có mô tả":
+            st.caption(f"ℹ️ {description}")
         main_cols = tables_repo.get_columns(client, main["id"])
         st.caption("Chọn SELECT * hoặc các cột riêng lẻ.")
         select_all_main = st.checkbox("SELECT * (toàn bộ cột bảng chính)", key="select_all_main")
@@ -89,7 +107,7 @@ def render(client):
         for i in range(int(link_count)):
             with st.expander(f"Link bảng {i + 1}", expanded=True):
                 choices = [t for t in tables if t["id"] != main["id"]]
-                join_table = st.selectbox("Bảng cần link", choices, format_func=lambda x:x["table_name"], key=f"jt{i}")
+                join_table = st.selectbox("Bảng cần link", choices, format_func=lambda x: table_labels[x["id"]], key=f"jt{i}")
                 join_cols = tables_repo.get_columns(client, join_table["id"])
                 join_type = st.selectbox("Loại JOIN", ["LEFT JOIN", "INNER JOIN", "RIGHT JOIN", "FULL OUTER JOIN", "CROSS JOIN"], key=f"jtype{i}")
                 suggest_l, suggest_r = _suggest(main_cols, join_cols)
@@ -100,7 +118,6 @@ def render(client):
     with right:
         all_columns = [(f"t1.{c['column_name']}", c) for c in main_cols]
         for idx, link in enumerate(links, 2): all_columns += [(f"t{idx}.{c['column_name']}", c) for c in tables_repo.get_columns(client, link["table"]["id"])]
-        lookups = lookups_repo.get_lookups(client)
         condition_count = st.number_input("Số điều kiện WHERE", 0, 10, 0, step=1)
         conditions = []
         ops = ["=", "!=", ">", "<", ">=", "<=", "LIKE", "IN", "BETWEEN", "IS NULL", "IS NOT NULL"]
