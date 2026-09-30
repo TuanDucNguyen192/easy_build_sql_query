@@ -72,15 +72,17 @@ def render(client):
     with left:
         main = st.selectbox("Bảng chính", tables, index=default_idx, format_func=lambda x: x["table_name"])
         main_cols = tables_repo.get_columns(client, main["id"])
-        st.caption("Chọn SELECT * hoặc các cột riêng lẻ. Kéo thả cột để đổi thứ tự trong SQL.")
+        st.caption("Chọn SELECT * hoặc các cột riêng lẻ.")
         select_all_main = st.checkbox("SELECT * (toàn bộ cột bảng chính)", key="select_all_main")
         selected_names = st.multiselect("Các cột hiển thị", [c["column_name"] for c in main_cols], default=[c["column_name"] for c in main_cols], key=f"selected_columns_{main['id']}", disabled=select_all_main)
-        if selected_names and sort_items:
-            ordered_names = sort_items(selected_names, direction="vertical", key=f"column_order_{main['id']}")
-        else:
-            ordered_names = selected_names
-            if selected_names:
-                st.caption("Cài `pip install -r requirements.txt` để bật kéo-thả thứ tự cột.")
+        ordered_names = selected_names
+        if selected_names:
+            # Popover giữ giao diện Query gọn; danh sách kéo-thả chỉ hiện khi cần đổi thứ tự.
+            with st.popover("↕ Sắp xếp vị trí cột", use_container_width=True):
+                if sort_items:
+                    ordered_names = sort_items(selected_names, direction="vertical", key=f"column_order_{main['id']}")
+                else:
+                    st.info("Cài `pip install -r requirements.txt` để bật kéo-thả thứ tự cột.")
         selected = [next(c for c in main_cols if c["column_name"] == name) for name in ordered_names]
         link_count = st.number_input("Số bảng link (JOIN)", 0, 5, 0, step=1)
         links = []
@@ -89,11 +91,12 @@ def render(client):
                 choices = [t for t in tables if t["id"] != main["id"]]
                 join_table = st.selectbox("Bảng cần link", choices, format_func=lambda x:x["table_name"], key=f"jt{i}")
                 join_cols = tables_repo.get_columns(client, join_table["id"])
+                join_type = st.selectbox("Loại JOIN", ["LEFT JOIN", "INNER JOIN", "RIGHT JOIN", "FULL OUTER JOIN", "CROSS JOIN"], key=f"jtype{i}")
                 suggest_l, suggest_r = _suggest(main_cols, join_cols)
-                left_col = st.selectbox("Cột nối bảng chính", main_cols, index=main_cols.index(suggest_l), format_func=lambda x:x["column_name"], key=f"jl{i}")
-                right_col = st.selectbox("Cột nối bảng link", join_cols, index=join_cols.index(suggest_r), format_func=lambda x:x["column_name"], key=f"jr{i}")
+                left_col = st.selectbox("Cột nối bảng chính", main_cols, index=main_cols.index(suggest_l), format_func=lambda x:x["column_name"], key=f"jl{i}", disabled=join_type == "CROSS JOIN")
+                right_col = st.selectbox("Cột nối bảng link", join_cols, index=join_cols.index(suggest_r), format_func=lambda x:x["column_name"], key=f"jr{i}", disabled=join_type == "CROSS JOIN")
                 names = st.multiselect("Cột lấy thêm", [c["column_name"] for c in join_cols], key=f"jc{i}")
-                links.append({"table": join_table, "left": left_col, "right": right_col, "selected": [c for c in join_cols if c["column_name"] in names]})
+                links.append({"table": join_table, "join_type": join_type, "left": left_col, "right": right_col, "selected": [c for c in join_cols if c["column_name"] in names]})
     with right:
         all_columns = [(f"t1.{c['column_name']}", c) for c in main_cols]
         for idx, link in enumerate(links, 2): all_columns += [(f"t{idx}.{c['column_name']}", c) for c in tables_repo.get_columns(client, link["table"]["id"])]

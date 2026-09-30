@@ -54,7 +54,14 @@ def build_sql(state):
         fields = [f"{alias}.*"]
     lines = ["SELECT " + ",\n       ".join(fields), f"FROM {table} {alias}"]
     for index, link in enumerate(links, 2):
-        lines.append(f"LEFT JOIN {ident(link['table']['table_name'])} t{index} ON {alias}.{ident(link['left']['column_name'])} = t{index}.{ident(link['right']['column_name'])}")
+        join_type = link.get("join_type", "LEFT JOIN")
+        if join_type not in {"LEFT JOIN", "INNER JOIN", "RIGHT JOIN", "FULL OUTER JOIN", "CROSS JOIN"}:
+            raise ValueError(f"Loại JOIN không hợp lệ: {join_type}")
+        join_table = f"{join_type} {ident(link['table']['table_name'])} t{index}"
+        if join_type == "CROSS JOIN":
+            lines.append(join_table)
+        else:
+            lines.append(f"{join_table} ON {alias}.{ident(link['left']['column_name'])} = t{index}.{ident(link['right']['column_name'])}")
     conditions = [condition_sql(c) for c in state.get("conditions", [])]
     if conditions:
         lines.append("WHERE " + "\n  AND ".join(conditions))
