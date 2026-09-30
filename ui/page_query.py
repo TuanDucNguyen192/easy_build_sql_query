@@ -1,5 +1,10 @@
 import streamlit as st
 import streamlit.components.v1 as components
+try:
+    from streamlit_sortables import sort_items
+except ModuleNotFoundError:
+    # Không chặn toàn bộ ứng dụng khi máy chủ chưa cài dependency mới.
+    sort_items = None
 from db import tables_repo, lookups_repo, history_repo
 from core.sql_builder import build_sql
 from core.lookup_helper import lookup_for_column, values_as_options
@@ -16,7 +21,7 @@ def _suggest(left_columns, right_columns):
 
 def _value_input(key, col, operator, lookups, client):
     if operator in ("IS NULL", "IS NOT NULL"): return None, None
-    lookup = lookup_for_column(col["column_name"], lookups) if col.get("is_lookup_column") else None
+    lookup = lookup_for_column(col["column_name"], lookups)
     if lookup and operator not in ("IN", "BETWEEN"):
         opts = values_as_options(lookups_repo.get_values(client, lookup["id"]))
         label = st.selectbox("Giá trị", list(opts), key=f"val_{key}") if opts else st.text_input("Giá trị", key=f"val_{key}")
@@ -34,6 +39,26 @@ def _value_input(key, col, operator, lookups, client):
     return st.text_input(hint, key=f"val_{key}"), None
 
 
+def _time_condition(all_columns):
+    date_columns = [x for x in all_columns if x[1].get("data_type", "").upper().startswith(("DATE", "TIMESTAMP"))]
+    if not st.checkbox("Thêm điều kiện thời gian", key="use_time_filter"):
+        return None
+    if not date_columns:
+        st.warning("Không có cột DATE/TIMESTAMP để lọc thời gian.")
+        return None
+    choice = st.selectbox("Cột thời gian", date_columns, format_func=lambda x: x[0], key="time_column")
+    preset = st.selectbox("Khoảng thời gian", ["Hôm nay", "Hôm qua", "7 ngày gần nhất", "30 ngày gần nhất", "Tháng này", "Tháng trước", "Tùy chọn"], key="time_preset")
+    if preset == "Tùy chọn":
+        return {"ref": choice[0], "op": "BETWEEN", "value": str(st.date_input("Từ ngày", key="time_start")), "value2": str(st.date_input("Đến ngày", key="time_end")), "data_type": choice[1].get("data_type")}
+    expressions = {
+        "Hôm nay": ("TRUNC(SYSDATE)", "TRUNC(SYSDATE) + 1"), "Hôm qua": ("TRUNC(SYSDATE) - 1", "TRUNC(SYSDATE)"),
+        "7 ngày gần nhất": ("TRUNC(SYSDATE) - 6", "TRUNC(SYSDATE) + 1"), "30 ngày gần nhất": ("TRUNC(SYSDATE) - 29", "TRUNC(SYSDATE) + 1"),
+        "Tháng này": ("TRUNC(SYSDATE, 'MM')", "ADD_MONTHS(TRUNC(SYSDATE, 'MM'), 1)"), "Tháng trước": ("ADD_MONTHS(TRUNC(SYSDATE, 'MM'), -1)", "TRUNC(SYSDATE, 'MM')"),
+    }
+    start, end = expressions[preset]
+    return {"ref": choice[0], "op": "RANGE_EXCLUSIVE_END", "value": start, "value2": end, "data_type": choice[1].get("data_type")}
+
+
 def render(client):
     st.subheader("Query Builder")
     if st.button("↻ Refresh data"):
@@ -47,8 +72,16 @@ def render(client):
     with left:
         main = st.selectbox("Bảng chính", tables, index=default_idx, format_func=lambda x: x["table_name"])
         main_cols = tables_repo.get_columns(client, main["id"])
-        selected_names = st.multiselect("Cột hiển thị", [c["column_name"] for c in main_cols], default=[c["column_name"] for c in main_cols])
-        selected = [c for c in main_cols if c["column_name"] in selected_names]
+        st.caption("Chọn SELECT * hoặc các cột riêng lẻ. Kéo thả cột để đổi thứ tự trong SQL.")
+        select_all_main = st.checkbox("SELECT * (toàn bộ cột bảng chính)", key="select_all_main")
+        selected_names = st.multiselect("Các cột hiển thị", [c["column_name"] for c in main_cols], default=[c["column_name"] for c in main_cols], key=f"selected_columns_{main['id']}", disabled=select_all_main)
+        if selected_names and sort_items:
+            ordered_names = sort_items(selected_names, direction="vertical", key=f"column_order_{main['id']}")
+        else:
+            ordered_names = selected_names
+            if selected_names:
+                st.caption("Cài `pip install -r requirements.txt` để bật kéo-thả thứ tự cột.")
+        selected = [next(c for c in main_cols if c["column_name"] == name) for name in ordered_names]
         link_count = st.number_input("Số bảng link (JOIN)", 0, 5, 0, step=1)
         links = []
         for i in range(int(link_count)):
@@ -74,10 +107,13 @@ def render(client):
                 op = st.selectbox("Toán tử", ops, key=f"op{i}")
                 value, value2 = _value_input(i, choice[1], op, lookups, client)
                 conditions.append({"ref": choice[0], "op": op, "value": value, "value2": value2, "data_type": choice[1].get("data_type")})
+        time_condition = _time_condition(all_columns)
+        if time_condition:
+            conditions.append(time_condition)
         limit = st.selectbox("Số lượng", [10, 50, 100, 500, 1000, "Tất cả"])
         order_choice = st.selectbox("Sắp xếp", ["Không sắp xếp"] + [x[0] for x in all_columns])
         direction = st.selectbox("Chiều sắp xếp", ["ASC", "DESC"])
-    state = {"main": main, "selected": selected, "links": links, "conditions": conditions, "limit": limit,
+    state = {"main": main, "selected": selected, "select_all_main": select_all_main, "links": links, "conditions": conditions, "limit": limit,
              "order": None if order_choice == "Không sắp xếp" else {"ref": order_choice, "direction": direction}}
     try: sql = build_sql(state)
     except Exception as exc: sql = f"-- Lỗi sinh SQL: {exc}"

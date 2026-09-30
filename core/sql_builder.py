@@ -28,6 +28,8 @@ def condition_sql(c):
         return f"{col} {op}"
     if op == "BETWEEN":
         return f"{col} BETWEEN {value_sql(c.get('value', ''), data_type)} AND {value_sql(c.get('value2', ''), data_type)}"
+    if op == "RANGE_EXCLUSIVE_END":
+        return f"{col} >= {c.get('value')} AND {col} < {c.get('value2')}"
     if op == "IN":
         vals = [v.strip() for v in str(c.get("value", "")).split(",") if v.strip()]
         return f"{col} IN ({', '.join(value_sql(v, data_type) for v in vals)})"
@@ -42,7 +44,8 @@ def build_sql(state):
         return "-- Chọn bảng chính để tạo SQL"
     table, alias = ident(main["table_name"]), "t1"
     selected = state.get("selected", [])
-    fields = [f"{alias}.{ident(c['column_name'])}" for c in selected]
+    # SELECT * chỉ áp dụng cho bảng chính; cột JOIN luôn được đặt alias rõ ràng.
+    fields = [f"{alias}.*"] if state.get("select_all_main") else [f"{alias}.{ident(c['column_name'])}" for c in selected]
     links = state.get("links", [])
     for index, link in enumerate(links, 2):
         for col in link.get("selected", []):

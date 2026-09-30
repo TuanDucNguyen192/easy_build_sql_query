@@ -37,8 +37,9 @@ SUPABASE_KEY = "<anon-key>"
 
 - Admin vào **Bảng & Cột** để thêm metadata hoặc import CSV cột có header `column_name,data_type`.
 - Để import hàng loạt schema thực tế, dùng khối **Import toàn bộ schema**. File CSV cần `table_name,column_name,data_type`; có thể lấy [mẫu](samples/schema_import_example.csv). Các cột tùy chọn: `is_primary_key`, `is_lookup_column`, `description`. Chạy lại cùng file sẽ cập nhật cột thay vì tạo trùng.
-- Admin vào **Lookup** để khai báo cột `USER_ID` / `STATUS_ID` và import CSV `id,display_value`.
-- Mọi người vào **Query**, chọn bảng, cột, JOIN, điều kiện, sắp xếp. SQL cập nhật tức thời và luôn dùng `FETCH FIRST n ROWS ONLY` đúng Oracle.
+- Admin vào **Lookup** để khai báo cột `USER_ID` / `STATUS_ID`, thêm từng giá trị quan trọng hoặc import CSV `id,display_value`. Khi người dùng chọn cột đó trong điều kiện, ô **Giá trị** sẽ gợi ý theo tên hiển thị và sinh đúng ID vào SQL.
+- Mọi người vào **Query** có thể chọn `SELECT *` cho bảng chính, hoặc chọn các cột riêng lẻ và kéo-thả để đổi thứ tự chúng trong `SELECT`. SQL cập nhật tức thời và luôn dùng `FETCH FIRST n ROWS ONLY` đúng Oracle.
+- Tích **Thêm điều kiện thời gian** để tự sinh điều kiện cho hôm nay, hôm qua, 7/30 ngày gần nhất, tháng này, tháng trước hoặc khoảng ngày tự chọn. Các khoảng chọn nhanh dùng mốc Oracle `SYSDATE`, nên luôn đúng vào lúc chạy query.
 - Lịch sử query dùng chung; người tạo chỉ xóa được query của mình, admin xóa được toàn bộ.
 
 ## Backup
