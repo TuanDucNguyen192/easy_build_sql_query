@@ -3,11 +3,39 @@ import re
 
 
 def ident(value):
-    """Chỉ nhận identifier Oracle để tránh sinh SQL sai từ metadata."""
+    """Nhận identifier Oracle hoặc tên bảng có schema/database link.
+
+    Giữ tương thích với các module/bản app cũ còn gọi ``ident(table_name)``.
+    Mẫu được chấp nhận: TABLE, SCHEMA.TABLE, TABLE@DBLINK,
+    SCHEMA.TABLE@DBLINK.
+    """
     value = str(value or "").upper()
-    if not re.fullmatch(r"[A-Z][A-Z0-9_$#]*", value):
-        raise ValueError(f"Tên Oracle không hợp lệ: {value}")
-    return value
+    simple = r"[A-Z][A-Z0-9_$#]*"
+    if re.fullmatch(simple, value):
+        return value
+    if re.fullmatch(rf"{simple}(?:\.{simple})?(?:@{simple})?", value):
+        return value
+    raise ValueError(f"Tên Oracle không hợp lệ: {value}")
+
+
+def oracle_table_ref(value):
+    """Cho phép tên bảng Oracle có schema và database link.
+
+    Ví dụ hợp lệ: SAJET.SMT_BDCODE_MEDGRECORD@YASHOKZFATP_VNMESZ.
+    Từng phần vẫn phải là identifier Oracle, nên không cho chèn SQL tùy ý.
+    """
+    value = str(value or "").upper()
+    match = re.fullmatch(r"([A-Z][A-Z0-9_$#]*)(?:\.([A-Z][A-Z0-9_$#]*))?(?:@([A-Z][A-Z0-9_$#]*))?", value)
+    if not match:
+        raise ValueError(f"Tên bảng Oracle không hợp lệ: {value}")
+    owner, table, dblink = match.groups()
+    result = f"{owner}.{table}" if table else owner
+    return f"{result}@{dblink}" if dblink else result
+
+
+def table_alias_prefix(table_name):
+    """Alias SELECT từ tên bảng đầy đủ: SCHEMA.TABLE@LINK → TABLE."""
+    return ident(str(table_name).split("@")[0].split(".")[-1])
 
 
 def quote(value):
@@ -42,14 +70,14 @@ def build_sql(state):
     main = state.get("main")
     if not main:
         return "-- Chọn bảng chính để tạo SQL"
-    table, alias = ident(main["table_name"]), "t1"
+    table, alias = oracle_table_ref(main["table_name"]), "t1"
     selected = state.get("selected", [])
     # SELECT * chỉ áp dụng cho bảng chính; cột JOIN luôn được đặt alias rõ ràng.
     fields = [f"{alias}.*"] if state.get("select_all_main") else [f"{alias}.{ident(c['column_name'])}" for c in selected]
     links = state.get("links", [])
     for index, link in enumerate(links, 2):
         for col in link.get("selected", []):
-            fields.append(f"t{index}.{ident(col['column_name'])} AS {ident(link['table']['table_name'])}_{ident(col['column_name'])}")
+            fields.append(f"t{index}.{ident(col['column_name'])} AS {table_alias_prefix(link['table']['table_name'])}_{ident(col['column_name'])}")
     if not fields:
         fields = [f"{alias}.*"]
     lines = ["SELECT " + ",\n       ".join(fields), f"FROM {table} {alias}"]
@@ -57,7 +85,7 @@ def build_sql(state):
         join_type = link.get("join_type", "LEFT JOIN")
         if join_type not in {"LEFT JOIN", "INNER JOIN", "RIGHT JOIN", "FULL OUTER JOIN", "CROSS JOIN"}:
             raise ValueError(f"Loại JOIN không hợp lệ: {join_type}")
-        join_table = f"{join_type} {ident(link['table']['table_name'])} t{index}"
+        join_table = f"{join_type} {oracle_table_ref(link['table']['table_name'])} t{index}"
         if join_type == "CROSS JOIN":
             lines.append(join_table)
         else:
