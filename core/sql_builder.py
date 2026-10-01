@@ -61,7 +61,11 @@ def build_sql(state):
         if join_type == "CROSS JOIN":
             lines.append(join_table)
         else:
-            lines.append(f"{join_table} ON {alias}.{ident(link['left']['column_name'])} = t{index}.{ident(link['right']['column_name'])}")
+            # left_alias do UI sinh ra: t1 hoặc một bảng JOIN trước đó (t2, t3...).
+            left_alias = link.get("left_alias", alias)
+            if not re.fullmatch(r"t[1-9][0-9]*", left_alias):
+                raise ValueError("Alias bảng nối không hợp lệ")
+            lines.append(f"{join_table} ON {left_alias}.{ident(link['left']['column_name'])} = t{index}.{ident(link['right']['column_name'])}")
     conditions = [condition_sql(c) for c in state.get("conditions", [])]
     if conditions:
         lines.append("WHERE " + "\n  AND ".join(conditions))

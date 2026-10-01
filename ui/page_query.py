@@ -106,15 +106,29 @@ def render(client):
         links = []
         for i in range(int(link_count)):
             with st.expander(f"Link bảng {i + 1}", expanded=True):
+                # Nguồn nối gồm bảng chính và MỌI bảng đã JOIN trước đó,
+                # không ép JOIN mới phải nối từ t1 hoặc link liền kề.
+                join_sources = [{"alias": "t1", "table": main, "columns": main_cols}]
+                for previous_index, previous_link in enumerate(links, start=2):
+                    join_sources.append({"alias": f"t{previous_index}", "table": previous_link["table"],
+                                         "columns": tables_repo.get_columns(client, previous_link["table"]["id"])})
+                source = st.selectbox(
+                    "Nối từ bảng đã chọn",
+                    join_sources,
+                    format_func=lambda x: f"{x['alias']} · {table_labels[x['table']['id']]}",
+                    key=f"join_source{i}",
+                    help="Có thể chọn bảng chính hoặc bất kỳ bảng JOIN nào xuất hiện trước link này.",
+                )
                 choices = [t for t in tables if t["id"] != main["id"]]
                 join_table = st.selectbox("Bảng cần link", choices, format_func=lambda x: table_labels[x["id"]], key=f"jt{i}")
                 join_cols = tables_repo.get_columns(client, join_table["id"])
                 join_type = st.selectbox("Loại JOIN", ["LEFT JOIN", "INNER JOIN", "RIGHT JOIN", "FULL OUTER JOIN", "CROSS JOIN"], key=f"jtype{i}")
-                suggest_l, suggest_r = _suggest(main_cols, join_cols)
-                left_col = st.selectbox("Cột nối bảng chính", main_cols, index=main_cols.index(suggest_l), format_func=lambda x:x["column_name"], key=f"jl{i}", disabled=join_type == "CROSS JOIN")
+                source_cols = source["columns"]
+                suggest_l, suggest_r = _suggest(source_cols, join_cols)
+                left_col = st.selectbox("Cột nối bảng đã chọn", source_cols, index=source_cols.index(suggest_l), format_func=lambda x:x["column_name"], key=f"jl{i}", disabled=join_type == "CROSS JOIN")
                 right_col = st.selectbox("Cột nối bảng link", join_cols, index=join_cols.index(suggest_r), format_func=lambda x:x["column_name"], key=f"jr{i}", disabled=join_type == "CROSS JOIN")
                 names = st.multiselect("Cột lấy thêm", [c["column_name"] for c in join_cols], key=f"jc{i}")
-                links.append({"table": join_table, "join_type": join_type, "left": left_col, "right": right_col, "selected": [c for c in join_cols if c["column_name"] in names]})
+                links.append({"table": join_table, "join_type": join_type, "left_alias": source["alias"], "left": left_col, "right": right_col, "selected": [c for c in join_cols if c["column_name"] in names]})
     with right:
         all_columns = [(f"t1.{c['column_name']}", c) for c in main_cols]
         for idx, link in enumerate(links, 2): all_columns += [(f"t{idx}.{c['column_name']}", c) for c in tables_repo.get_columns(client, link["table"]["id"])]
