@@ -1,17 +1,42 @@
-"""Đăng nhập Supabase Auth và role của người dùng."""
+"""Đăng nhập Supabase Auth và role của người dùng trong phiên hiện tại."""
 import streamlit as st
+
+def restore_login(client):
+    """Khôi phục client sau các lần rerun, không lưu token vào cookie/browser."""
+    session = st.session_state.get("auth_session")
+    if not session:
+        return st.session_state.get("user")
+    try:
+        result = client.auth.set_session(session["access_token"], session["refresh_token"])
+        st.session_state.user = result.user
+        st.session_state.auth_session = {
+            "access_token": result.session.access_token,
+            "refresh_token": result.session.refresh_token,
+        }
+        return result.user
+    except Exception:
+        for key in ("user", "profile", "auth_session"):
+            st.session_state.pop(key, None)
+        return None
 
 
 def login(client, email, password):
     result = client.auth.sign_in_with_password({"email": email, "password": password})
     st.session_state.user = result.user
+    # session_state thuộc riêng tab hiện tại và bị xóa khi người dùng F5.
+    st.session_state.auth_session = {
+        "access_token": result.session.access_token,
+        "refresh_token": result.session.refresh_token,
+    }
     return result.user
 
 
 def logout(client):
-    client.auth.sign_out()
-    for key in ("user", "profile", "query_state"):
-        st.session_state.pop(key, None)
+    try:
+        client.auth.sign_out()
+    finally:
+        for key in ("user", "profile", "query_state", "auth_session"):
+            st.session_state.pop(key, None)
 
 
 def current_profile(client):

@@ -80,7 +80,8 @@ def build_sql(state):
             fields.append(f"t{index}.{ident(col['column_name'])} AS {table_alias_prefix(link['table']['table_name'])}_{ident(col['column_name'])}")
     if not fields:
         fields = [f"{alias}.*"]
-    lines = ["SELECT " + ",\n       ".join(fields), f"FROM {table} {alias}"]
+    select_keyword = "SELECT DISTINCT" if state.get("distinct") else "SELECT"
+    lines = [select_keyword + " " + ",\n       ".join(fields), f"FROM {table} {alias}"]
     for index, link in enumerate(links, 2):
         join_type = link.get("join_type", "LEFT JOIN")
         if join_type not in {"LEFT JOIN", "INNER JOIN", "RIGHT JOIN", "FULL OUTER JOIN", "CROSS JOIN"}:

@@ -29,15 +29,25 @@ def render(client):
         st.session_state.update_set_count = count - 1; st.rerun()
     st.markdown("### WHERE — Điều kiện")
     conditions = render_where_conditions("update", columns, lookups, client)
-    sql = build_update_sql(table["table_name"], assignments, conditions)
+    generated_sql = build_update_sql(table["table_name"], assignments, conditions)
     if not conditions:
         st.error("⚠️ Không có điều kiện WHERE — sẽ update TOÀN BỘ bảng!")
-    st.subheader("SQL Oracle"); st.code(sql, language="sql")
+    st.subheader("SQL Oracle")
+    sql = st.text_area("SQL Oracle (có thể sửa trước khi copy/lưu)", value=generated_sql,
+                       height=260, key=f"update_editable_sql_{hash(generated_sql)}")
     understood = st.checkbox("Tôi hiểu rủi ro", key="update_understood", disabled=bool(conditions)) if not conditions else True
     copy, save = st.columns(2)
     if copy.button("📋 Copy SQL", key="copy_update", disabled=not understood):
         components.html(f"<script>navigator.clipboard.writeText({sql!r});</script>", height=0); st.toast("Đã copy vào clipboard")
     name = save.text_input("Tên query để lưu", key="update_history_name")
+    note = save.text_area("Ghi chú", key="update_history_note", height=80)
     if save.button("💾 Lưu vào lịch sử", key="save_update", disabled=not understood):
         if not name: st.warning("Nhập tên query trước khi lưu.")
-        else: history_repo.save_history(client, name, {"table": table, "assignments": assignments, "conditions": conditions}, sql, st.session_state.user.id, "UPDATE"); st.success("Đã lưu vào lịch sử.")
+        else:
+            try:
+                missing_columns = history_repo.save_history(client, name, {"table": table, "assignments": assignments, "conditions": conditions}, sql, st.session_state.user.id, "UPDATE", note)
+                st.success("Đã lưu vào lịch sử.")
+                if missing_columns:
+                    st.warning("Database chưa có cột " + ", ".join(sorted(missing_columns)) + ". Admin hãy chạy file SQL migration để hoàn tất nâng cấp.")
+            except Exception as exc:
+                st.error(f"Không thể lưu lịch sử: {exc}")

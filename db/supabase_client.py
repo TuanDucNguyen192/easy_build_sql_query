@@ -3,8 +3,8 @@ import streamlit as st
 from supabase import create_client
 
 
-@st.cache_resource
 def get_client():
+    """Tạo client theo mỗi phiên/rerun để token không bị chia sẻ giữa user."""
     try:
         return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
     except Exception as exc:

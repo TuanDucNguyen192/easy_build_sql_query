@@ -51,14 +51,24 @@ def render(client):
     if row_count > 1 and remove.button("× Xóa dòng cuối"):
         st.session_state.insert_row_count = row_count - 1; st.rerun()
     version = st.selectbox("Phiên bản Oracle", ["19c (nhiều câu INSERT)", "23c+ (multi-row VALUES)"], key="insert_oracle_version")
-    sql = build_insert_sql(table["table_name"], rows, "23c" if version.startswith("23") else "19c")
+    generated_sql = build_insert_sql(table["table_name"], rows, "23c" if version.startswith("23") else "19c")
     if missing:
         st.warning("Thiếu giá trị cho cột bắt buộc: " + ", ".join(missing))
-    st.subheader("SQL Oracle"); st.code(sql, language="sql")
+    st.subheader("SQL Oracle")
+    sql = st.text_area("SQL Oracle (có thể sửa trước khi copy/lưu)", value=generated_sql,
+                       height=260, key=f"insert_editable_sql_{hash(generated_sql)}")
     copy, save = st.columns(2)
     if copy.button("📋 Copy SQL", key="copy_insert"):
         components.html(f"<script>navigator.clipboard.writeText({sql!r});</script>", height=0); st.toast("Đã copy vào clipboard")
     name = save.text_input("Tên query để lưu", key="insert_history_name")
+    note = save.text_area("Ghi chú", key="insert_history_note", height=80)
     if save.button("💾 Lưu vào lịch sử", key="save_insert"):
         if not name: st.warning("Nhập tên query trước khi lưu.")
-        else: history_repo.save_history(client, name, {"table": table, "rows": rows}, sql, st.session_state.user.id, "INSERT"); st.success("Đã lưu vào lịch sử.")
+        else:
+            try:
+                missing_columns = history_repo.save_history(client, name, {"table": table, "rows": rows}, sql, st.session_state.user.id, "INSERT", note)
+                st.success("Đã lưu vào lịch sử.")
+                if missing_columns:
+                    st.warning("Database chưa có cột " + ", ".join(sorted(missing_columns)) + ". Admin hãy chạy file SQL migration để hoàn tất nâng cấp.")
+            except Exception as exc:
+                st.error(f"Không thể lưu lịch sử: {exc}")

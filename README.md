@@ -6,7 +6,7 @@ Web app Streamlit tạo SQL Oracle bằng thao tác chuột. Ứng dụng không
 
 1. Tạo project miễn phí tại [Supabase](https://supabase.com/dashboard), vào **Project Settings → API** và copy Project URL cùng `anon` key.
 2. Mở SQL Editor của project, dán và chạy toàn bộ [sql/supabase_schema.sql](sql/supabase_schema.sql). Schema tạo bảng, RLS policy và dữ liệu mẫu.
-   Nếu đã có database từ phiên bản cũ, chỉ cần chạy thêm [sql/supabase_schema_update_insert_update.sql](sql/supabase_schema_update_insert_update.sql) để dùng lịch sử INSERT/UPDATE và metadata NULL/DEFAULT.
+   Nếu đã có database từ phiên bản cũ, chỉ cần chạy thêm [sql/supabase_schema_update_insert_update.sql](sql/supabase_schema_update_insert_update.sql) để dùng lịch sử INSERT/UPDATE, ghi chú và sơ đồ quan hệ bảng.
 3. Trong **Authentication → Users**, tạo user bằng email/password. Chạy câu này trong SQL Editor (thay email):
 
 ```sql
@@ -43,6 +43,8 @@ SUPABASE_KEY = "<anon-key>"
 - Tích **Thêm điều kiện thời gian** để tự sinh điều kiện cho hôm nay, hôm qua, 7/30 ngày gần nhất, tháng này, tháng trước hoặc khoảng ngày tự chọn. Các khoảng chọn nhanh dùng mốc Oracle `SYSDATE`, nên luôn đúng vào lúc chạy query.
 - Tab **Insert** sinh `INSERT` từ form cho mọi cột, có lookup, NULL, DEFAULT, tự bỏ khóa chính khi dùng sequence/trigger và hỗ trợ nhiều dòng. Chọn Oracle 19c để sinh từng câu INSERT hoặc 23c+ để dùng multi-row `VALUES`.
 - Tab **Update** sinh `UPDATE ... SET ... WHERE ...`; có lookup, NULL, DEFAULT và chặn Copy/Lưu khi `WHERE` trống cho đến khi tích xác nhận rủi ro.
+- SQL ở các tab Query, Insert và Update có thể sửa trực tiếp trước khi copy hoặc lưu. Ghi chú được lưu cùng lịch sử query.
+- Tab **🗺️ Sơ đồ bảng** hiển thị bảng, nhóm màu và quan hệ đã khai báo. Click node để xem cột/note, nhảy tới bảng liên quan hoặc chọn bảng đó cho tab Query. Chạy migration và cài dependencies trước khi sử dụng.
 - Lịch sử query dùng chung; người tạo chỉ xóa được query của mình, admin xóa được toàn bộ.
 
 ## Backup

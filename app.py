@@ -1,7 +1,7 @@
 import streamlit as st
 from db.supabase_client import get_client
-from core.auth import current_profile, logout, is_admin
-from ui import page_login, page_query, page_insert, page_update, page_tables, page_lookups, page_history, page_in_list
+from core.auth import current_profile, logout, is_admin, restore_login
+from ui import page_login, page_query, page_insert, page_update, page_tables, page_lookups, page_history, page_in_list, page_erd
 
 st.set_page_config(page_title="Oracle Quick Query", page_icon="⚡", layout="wide")
 
@@ -14,6 +14,8 @@ except RuntimeError as exc:
     st.stop()
     raise SystemExit(1)
 
+# Mỗi rerun tạo client mới; luôn gắn token của phiên tab hiện tại trước khi query.
+restore_login(client)
 if not st.session_state.get("user"):
     page_login.render(client); st.stop()
 
@@ -28,13 +30,14 @@ with st.sidebar:
     if st.button("Đăng xuất"):
         logout(client); st.rerun()
 
-tabs = ["Query", "Insert", "Update", "SQL IN-List"] + (["Bảng & Cột", "Lookup"] if is_admin() else []) + ["Lịch sử"]
+tabs = ["Query", "Insert", "Update", "SQL IN-List", "🗺️ Sơ đồ bảng"] + (["Bảng & Cột", "Lookup"] if is_admin() else []) + ["Lịch sử"]
 selected = st.tabs(tabs)
 with selected[0]: page_query.render(client)
 with selected[1]: page_insert.render(client)
 with selected[2]: page_update.render(client)
 with selected[3]: page_in_list.render()
-i = 4
+with selected[4]: page_erd.render(client)
+i = 5
 if is_admin():
     with selected[i]: page_tables.render(client)
     i += 1

@@ -79,19 +79,29 @@ def render(client):
         st.cache_data.clear(); st.rerun()
     tables = tables_repo.get_tables(client)
     if not tables: st.info("Chưa có metadata. Admin hãy thêm bảng và cột."); return
+    # Nhận lựa chọn từ tab Sơ đồ trước khi selectbox được tạo ở lần rerun này.
+    erd_table_name = st.session_state.pop("query_table_from_erd", None)
+    if erd_table_name:
+        erd_table = next((table for table in tables if table["table_name"] == erd_table_name), None)
+        if erd_table:
+            st.session_state.main_table_selector = erd_table
+            st.session_state.query_state = {"main": erd_table}
     table_labels, lookups = _table_labels(client, tables)
     state_saved = st.session_state.get("query_state", {})
     default_name = state_saved.get("main", {}).get("table_name")
     default_idx = next((i for i,t in enumerate(tables) if t["table_name"] == default_name), 0)
     left, right = st.columns(2)
     with left:
-        main = st.selectbox("Bảng chính", tables, index=default_idx, format_func=lambda x: table_labels[x["id"]], help="Hiển thị tên Oracle kèm mô tả từ lookup TABLE_NAME.")
+        main = st.selectbox("Bảng chính", tables, index=default_idx, key="main_table_selector",
+                            format_func=lambda x: table_labels[x["id"]], help="Hiển thị tên Oracle kèm mô tả từ lookup TABLE_NAME.")
         description = table_labels[main["id"]].partition(" — ")[2]
         if description and description != "Chưa có mô tả":
             st.caption(f"ℹ️ {description}")
         main_cols = tables_repo.get_columns(client, main["id"])
         st.caption("Chọn SELECT * hoặc các cột riêng lẻ.")
         select_all_main = st.checkbox("SELECT * (toàn bộ cột bảng chính)", key="select_all_main")
+        distinct = st.checkbox("DISTINCT (loại dòng trùng)", key="select_distinct", disabled=select_all_main,
+                               help="Chọn một cột để lấy giá trị không trùng. Với nhiều cột, DISTINCT áp dụng cho tổ hợp cột.")
         selected_names = st.multiselect("Các cột hiển thị", [c["column_name"] for c in main_cols], default=[c["column_name"] for c in main_cols], key=f"selected_columns_{main['id']}", disabled=select_all_main)
         ordered_names = selected_names
         if selected_names:
@@ -157,21 +167,28 @@ def render(client):
         limit = st.selectbox("Số lượng", [10, 50, 100, 500, 1000, "Tất cả"], index=5)
         order_choice = st.selectbox("Sắp xếp", ["Không sắp xếp"] + [x[0] for x in all_columns])
         direction = st.selectbox("Chiều sắp xếp", ["ASC", "DESC"])
-    state = {"main": main, "selected": selected, "select_all_main": select_all_main, "links": links, "conditions": conditions,
+    state = {"main": main, "selected": selected, "select_all_main": select_all_main, "distinct": distinct, "links": links, "conditions": conditions,
              "group_by": [item[0] for item in group_choices], "having": having_conditions, "limit": limit,
              "order": None if order_choice == "Không sắp xếp" else {"ref": order_choice, "direction": direction}}
-    try: sql = build_sql(state)
-    except Exception as exc: sql = f"-- Lỗi sinh SQL: {exc}"
+    try: generated_sql = build_sql(state)
+    except Exception as exc: generated_sql = f"-- Lỗi sinh SQL: {exc}"
     st.divider(); st.subheader("SQL Oracle")
-    st.code(sql, language="sql")
+    sql = st.text_area("SQL Oracle (có thể sửa trước khi copy/lưu)", value=generated_sql,
+                       height=260, key=f"query_editable_sql_{hash(generated_sql)}")
     a, b = st.columns(2)
     if a.button("📋 Copy SQL", type="primary"):
         # Clipboard thuộc browser để hoạt động cả trên Streamlit Cloud.
         components.html(f"<script>navigator.clipboard.writeText({sql!r});</script>", height=0)
         st.toast("Đã copy vào clipboard")
     name = b.text_input("Tên query để lưu", placeholder="Ví dụ: Đơn hàng Active")
+    note = b.text_area("Ghi chú", placeholder="Mục đích sử dụng, điều kiện cần lưu ý...", key="query_history_note", height=80)
     if b.button("💾 Lưu query"):
         if not name: st.warning("Nhập tên query trước khi lưu.")
         else:
-            history_repo.save_history(client, name, state, sql, st.session_state.user.id)
-            st.success("Đã lưu vào lịch sử dùng chung.")
+            try:
+                missing_columns = history_repo.save_history(client, name, state, sql, st.session_state.user.id, note=note)
+                st.success("Đã lưu vào lịch sử dùng chung.")
+                if missing_columns:
+                    st.warning("Database chưa có cột " + ", ".join(sorted(missing_columns)) + ". Admin hãy chạy file SQL migration để hoàn tất nâng cấp.")
+            except Exception as exc:
+                st.error(f"Không thể lưu lịch sử: {exc}")

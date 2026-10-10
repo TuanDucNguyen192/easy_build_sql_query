@@ -11,6 +11,8 @@ def render(client):
     for row in rows:
         with st.expander(f"[{row.get('query_type', 'SELECT')}] {row.get('name', 'Không tên')} · {row.get('creator_email', '')} · {str(row.get('created_at', ''))[:16]}"):
             st.code(row["sql_text"], language="sql")
+            if row.get("note"):
+                st.info(f"📝 {row['note']}")
             a, b = st.columns(2)
             if a.button("Nạp query", key=f"load{row['id']}"):
                 st.session_state.query_state = row["state_json"]; st.success("Đã nạp. Mở tab Query.")
