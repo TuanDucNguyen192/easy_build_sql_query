@@ -16,5 +16,7 @@ def render(client):
             a, b = st.columns(2)
             if a.button("Nạp query", key=f"load{row['id']}"):
                 st.session_state.query_state = row["state_json"]; st.success("Đã nạp. Mở tab Query.")
-            if (is_admin() or row.get("created_by") == st.session_state.user.id) and b.button("Xóa", key=f"del{row['id']}"):
+            user_id = getattr(st.session_state.get("user"), "id", None)
+            can_delete = is_admin() or (user_id and row.get("created_by") == user_id)
+            if can_delete and b.button("Xóa", key=f"del{row['id']}"):
                 history_repo.delete_history(client, row["id"]); st.rerun()

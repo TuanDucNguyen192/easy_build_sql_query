@@ -186,7 +186,8 @@ def render(client):
         if not name: st.warning("Nhập tên query trước khi lưu.")
         else:
             try:
-                missing_columns = history_repo.save_history(client, name, state, sql, st.session_state.user.id, note=note)
+                user_id = getattr(st.session_state.get("user"), "id", None)
+                missing_columns = history_repo.save_history(client, name, state, sql, user_id, note=note)
                 st.success("Đã lưu vào lịch sử dùng chung.")
                 if missing_columns:
                     st.warning("Database chưa có cột " + ", ".join(sorted(missing_columns)) + ". Admin hãy chạy file SQL migration để hoàn tất nâng cấp.")

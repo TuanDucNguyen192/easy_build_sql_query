@@ -9,7 +9,8 @@ def render(client):
         schema_file = st.file_uploader("CSV toàn bộ bảng/cột", type="csv", key="schema_csv")
         if schema_file and st.button("Import schema", type="primary"):
             try:
-                table_count, column_count = tables_repo.import_schema_csv(client, schema_file, st.session_state.user.id)
+                user_id = getattr(st.session_state.get("user"), "id", None)
+                table_count, column_count = tables_repo.import_schema_csv(client, schema_file, user_id)
                 st.success(f"Đã import {column_count} cột thuộc {table_count} bảng.")
                 st.rerun()
             except Exception as exc:
@@ -21,7 +22,8 @@ def render(client):
             desc = st.text_input("Mô tả")
             if st.form_submit_button("Lưu bảng"):
                 try:
-                    tables_repo.create_table(client, {"table_name": name, "alias": alias, "description": desc, "created_by": st.session_state.user.id})
+                    user_id = getattr(st.session_state.get("user"), "id", None)
+                    tables_repo.create_table(client, {"table_name": name, "alias": alias, "description": desc, "created_by": user_id})
                     st.success("Đã thêm bảng"); st.rerun()
                 except Exception as exc: st.error(str(exc))
     tables = tables_repo.get_tables(client)

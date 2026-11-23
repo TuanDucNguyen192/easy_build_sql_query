@@ -1,7 +1,7 @@
 import streamlit as st
 from db.supabase_client import get_client
-from core.auth import current_profile, logout, is_admin, restore_login
-from ui import page_login, page_query, page_insert, page_update, page_tables, page_lookups, page_history, page_in_list, page_erd
+from core.auth import current_profile, is_admin, auto_login
+from ui import page_query, page_insert, page_update, page_tables, page_lookups, page_history, page_in_list, page_erd
 
 st.set_page_config(page_title="Oracle Quick Query", page_icon="⚡", layout="wide")
 
@@ -14,21 +14,21 @@ except RuntimeError as exc:
     st.stop()
     raise SystemExit(1)
 
-# Mỗi rerun tạo client mới; luôn gắn token của phiên tab hiện tại trước khi query.
-restore_login(client)
-if not st.session_state.get("user"):
-    page_login.render(client); st.stop()
+# Tự động đăng nhập ngầm hoặc khởi tạo phiên admin để vào thẳng giao diện chính
+auto_login(client)
 
 try:
     st.session_state.profile = current_profile(client)
-except Exception as exc:
-    st.error(f"Không tải được quyền người dùng: {exc}"); st.stop()
+except Exception:
+    st.session_state.profile = {
+        "id": getattr(st.session_state.get("user"), "id", None),
+        "email": getattr(st.session_state.get("user"), "email", "admin@local"),
+        "role": "ADMIN",
+    }
 
 with st.sidebar:
-    st.write(f"**{st.session_state.profile.get('email', '')}**")
-    st.caption(f"Role: {st.session_state.profile.get('role', 'USER')}")
-    if st.button("Đăng xuất"):
-        logout(client); st.rerun()
+    st.write(f"**{st.session_state.profile.get('email', 'admin@local')}**")
+    st.caption(f"Role: {st.session_state.profile.get('role', 'ADMIN')}")
 
 tabs = ["Query", "Insert", "Update", "SQL IN-List", "🗺️ Sơ đồ bảng"] + (["Bảng & Cột", "Lookup"] if is_admin() else []) + ["Lịch sử"]
 selected = st.tabs(tabs)
