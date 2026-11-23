@@ -5,7 +5,7 @@ try:
 except ModuleNotFoundError:
     # Không chặn toàn bộ ứng dụng khi máy chủ chưa cài dependency mới.
     sort_items = None
-from db import tables_repo, lookups_repo, history_repo
+from db import tables_repo, lookups_repo, history_repo, relations_repo
 from core.sql_builder import build_sql
 from core.lookup_helper import lookup_for_column, values_as_options
 
@@ -98,6 +98,22 @@ def render(client):
         if description and description != "Chưa có mô tả":
             st.caption(f"ℹ️ {description}")
         main_cols = tables_repo.get_columns(client, main["id"])
+        with st.expander("🔒 Hidden Info: Cột & Bảng liên kết SQL", expanded=False):
+            st.markdown(f"**Bảng:** `{main['table_name']}`")
+            c_names = [c["column_name"] for c in main_cols]
+            st.text_area("Danh sách cột (tiện copy):", value=", ".join(c_names), height=60, key=f"q_hidden_cols_{main['id']}")
+            try:
+                rels = relations_repo.get_relations_for_table(client, main["table_name"])
+                if rels:
+                    st.markdown("**Bảng & Cột có thể JOIN trực tiếp:**")
+                    for r in rels:
+                        is_s = r["source_table"] == main["table_name"]
+                        other = r["target_table"] if is_s else r["source_table"]
+                        c_this = r.get("source_column") if is_s else r.get("target_column")
+                        c_other = r.get("target_column") if is_s else r.get("source_column")
+                        st.markdown(f"- **{other}**: `{main['table_name']}.{c_this} = {other}.{c_other}`")
+            except Exception:
+                pass
         st.caption("Chọn SELECT * hoặc các cột riêng lẻ.")
         select_all_main = st.checkbox("SELECT * (toàn bộ cột bảng chính)", key="select_all_main")
         distinct = st.checkbox("DISTINCT (loại dòng trùng)", key="select_distinct", disabled=select_all_main,

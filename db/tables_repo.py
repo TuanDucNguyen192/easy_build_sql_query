@@ -75,3 +75,40 @@ def import_schema_csv(client, file, user_id):
 def export_tables_csv(client):
     tables = get_tables(client)
     return pd.DataFrame(tables).to_csv(index=False).encode("utf-8-sig")
+
+
+def set_tables_group(client, table_names, group_name, color=None):
+    """Gán danh sách bảng vào một nhóm và gán màu sắc hiển thị."""
+    payload = {"group_name": group_name.strip() if group_name and group_name.strip() else None}
+    if color:
+        payload["color"] = color
+    for name in table_names:
+        client.table("tables_meta").update(payload).eq("table_name", name).execute()
+
+
+def update_group(client, old_group_name, new_group_name, new_color=None, included_tables=None):
+    """Đổi tên/màu nhóm và cập nhật danh sách các bảng thuộc nhóm."""
+    target_name = new_group_name.strip() if new_group_name and new_group_name.strip() else None
+    payload = {"group_name": target_name}
+    if new_color:
+        payload["color"] = new_color
+
+    if included_tables is not None:
+        included_set = set(included_tables)
+        curr_tables = client.table("tables_meta").select("table_name").eq("group_name", old_group_name).execute().data or []
+        curr_set = {t["table_name"] for t in curr_tables}
+        # Những bảng trước đây thuộc nhóm nhưng nay bị bỏ chọn -> gỡ nhóm
+        to_remove = curr_set - included_set
+        for name in to_remove:
+            client.table("tables_meta").update({"group_name": None}).eq("table_name", name).execute()
+        # Những bảng trong included_set -> cập nhật nhóm và màu
+        for name in included_tables:
+            client.table("tables_meta").update(payload).eq("table_name", name).execute()
+    else:
+        client.table("tables_meta").update(payload).eq("group_name", old_group_name).execute()
+
+
+def delete_group(client, group_name):
+    """Xóa nhóm: đặt group_name = None cho toàn bộ các bảng trong nhóm."""
+    return client.table("tables_meta").update({"group_name": None}).eq("group_name", group_name).execute()
+

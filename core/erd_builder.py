@@ -48,3 +48,35 @@ def filter_graph(tables, relations, group_name="Tất cả", search="", focus_ta
         relation for relation in relations
         if relation["source_table"] in visible and relation["target_table"] in visible
     ]
+
+
+def generate_table_join_sql(table_name, relations):
+    """Tạo câu lệnh SQL SELECT kèm JOIN đến tất cả các bảng có quan hệ trực tiếp để tiện tra cứu."""
+    table_rels = [
+        r for r in relations
+        if r.get("source_table") == table_name or r.get("target_table") == table_name
+    ]
+    if not table_rels:
+        return f"SELECT t1.*\nFROM {table_name} t1\nFETCH FIRST 100 ROWS ONLY;"
+
+    lines = ["SELECT t1.*"]
+    joins = []
+    used_aliases = {"t1"}
+
+    for idx, r in enumerate(table_rels, start=2):
+        alias = f"t{idx}"
+        if r["source_table"] == table_name:
+            other = r["target_table"]
+            scol = r.get("source_column") or "ID"
+            tcol = r.get("target_column") or "ID"
+            lines.append(f"     , {alias}.*")
+            joins.append(f"LEFT JOIN {other} {alias} ON t1.{scol} = {alias}.{tcol}")
+        else:
+            other = r["source_table"]
+            scol = r.get("source_column") or "ID"
+            tcol = r.get("target_column") or "ID"
+            lines.append(f"     , {alias}.*")
+            joins.append(f"LEFT JOIN {other} {alias} ON t1.{tcol} = {alias}.{scol}")
+
+    return "\n".join(lines) + f"\nFROM {table_name} t1\n" + "\n".join(joins) + "\nFETCH FIRST 100 ROWS ONLY;"
+
