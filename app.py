@@ -1,6 +1,37 @@
+import importlib
+from types import SimpleNamespace
 import streamlit as st
 from db.supabase_client import get_client
-from core.auth import current_profile, is_admin, auto_login
+import core.auth
+
+# Reload core.auth để Streamlit Cloud không dùng cache module cũ trong bộ nhớ
+try:
+    importlib.reload(core.auth)
+except Exception:
+    pass
+
+try:
+    from core.auth import current_profile, is_admin, auto_login
+except ImportError:
+    from core.auth import current_profile, is_admin
+    def auto_login(client):
+        from core.auth import restore_login
+        user = restore_login(client)
+        if user:
+            return user
+        email = st.secrets.get("AUTO_LOGIN_EMAIL") or st.secrets.get("DEFAULT_EMAIL")
+        password = st.secrets.get("AUTO_LOGIN_PASSWORD") or st.secrets.get("DEFAULT_PASSWORD")
+        if email and password:
+            try:
+                from core.auth import login
+                return login(client, str(email).strip(), str(password).strip())
+            except Exception as exc:
+                st.warning(f"Tự động đăng nhập Supabase thất bại ({email}): {exc}")
+        dummy = SimpleNamespace(id=None, email="admin@local")
+        st.session_state.user = dummy
+        st.session_state.profile = {"id": None, "email": "admin@local", "role": "ADMIN"}
+        return dummy
+
 from ui import page_query, page_insert, page_update, page_tables, page_lookups, page_history, page_in_list, page_erd
 
 st.set_page_config(page_title="Oracle Quick Query", page_icon="⚡", layout="wide")
