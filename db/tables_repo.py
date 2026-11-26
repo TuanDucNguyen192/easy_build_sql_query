@@ -17,6 +17,63 @@ def create_table(client, payload):
     return client.table("tables_meta").insert(payload).execute().data[0]
 
 
+def create_or_update_table(client, payload):
+    """Tạo mới hoặc cập nhật bảng nếu đã tồn tại theo table_name, trả về dict của bảng."""
+    name = str(payload.get("table_name") or "").strip().upper()
+    if not name:
+        raise ValueError("Tên bảng (table_name) không được để trống")
+    payload = dict(payload)
+    payload["table_name"] = name
+
+    cleaned = {k: v for k, v in payload.items() if v is not None}
+
+    existing = client.table("tables_meta").select("*").eq("table_name", name).execute().data
+    if existing:
+        table_id = existing[0]["id"]
+        update_data = {k: v for k, v in cleaned.items() if k != "id"}
+        if update_data:
+            client.table("tables_meta").update(update_data).eq("id", table_id).execute()
+        updated = client.table("tables_meta").select("*").eq("id", table_id).execute().data
+        return updated[0] if updated else existing[0]
+    else:
+        created = client.table("tables_meta").insert(cleaned).execute().data[0]
+        return created
+
+
+def batch_create_columns(client, table_id, columns_data):
+    """Tạo hoặc cập nhật hàng loạt cột cho bảng theo table_id."""
+    if not columns_data:
+        return 0
+    rows = []
+    for c in columns_data:
+        c_name = str(c.get("column_name") or "").strip().upper()
+        if not c_name:
+            continue
+        d_type = str(c.get("data_type") or "VARCHAR2").strip().upper()
+        if d_type in ("VARCHAR", "VARCHAR2", "CHAR", "NVARCHAR2"):
+            d_type = "VARCHAR2"
+        elif d_type in ("INT", "INTEGER", "NUMBER", "FLOAT", "DOUBLE"):
+            d_type = "NUMBER"
+
+        def _as_bool(v):
+            if isinstance(v, bool):
+                return v
+            return str(v).strip().lower() in ("1", "true", "t", "yes", "y", "✓", "x")
+
+        rows.append({
+            "table_id": table_id,
+            "column_name": c_name,
+            "data_type": d_type,
+            "is_primary_key": _as_bool(c.get("is_primary_key")),
+            "is_lookup_column": _as_bool(c.get("is_lookup_column")),
+            "description": str(c.get("description") or "").strip(),
+            "note": str(c.get("note") or "").strip(),
+        })
+    if rows:
+        client.table("columns_meta").upsert(rows, on_conflict="table_id,column_name").execute()
+    return len(rows)
+
+
 def update_table(client, table_id, payload):
     return client.table("tables_meta").update(payload).eq("id", table_id).execute()
 

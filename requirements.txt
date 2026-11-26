@@ -5,3 +5,4 @@ openpyxl>=3.1.0
 pyperclip>=1.9.0
 streamlit-sortables>=0.3.1
 streamlit-agraph>=0.0.45
+openai>=1.0.0

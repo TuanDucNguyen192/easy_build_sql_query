@@ -60,6 +60,9 @@ except Exception:
 with st.sidebar:
     st.write(f"**{st.session_state.profile.get('email', 'admin@local')}**")
     st.caption(f"Role: {st.session_state.profile.get('role', 'ADMIN')}")
+    st.divider()
+    from ui import sidebar_ai
+    sidebar_ai.render(client)
 
 tabs = ["Query", "Insert", "Update", "SQL IN-List", "🗺️ Sơ đồ bảng"] + (["Bảng & Cột", "Lookup"] if is_admin() else []) + ["Lịch sử"]
 selected = st.tabs(tabs)
